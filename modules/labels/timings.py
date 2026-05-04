@@ -169,8 +169,6 @@ def trim_label_horizon(
 # Horizon metadata
 # ──────────────────────────────────────────────────────────────
 
-@dataclass_stub = None  # avoid circular import; use plain dict below
-
 HORIZON_METADATA: Dict[int, Dict] = {
     1:  {"name": "1-day",   "category": "intraday",  "min_universe_days": 126},
     5:  {"name": "1-week",  "category": "short",     "min_universe_days": 252},
