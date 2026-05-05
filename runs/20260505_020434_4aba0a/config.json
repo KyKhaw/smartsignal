@@ -1,0 +1,23 @@
+{
+  "start_date": "2018-01-01",
+  "end_date": null,
+  "min_history_days": 504,
+  "min_avg_volume": 500000,
+  "min_avg_price": 5.0,
+  "execution_lag": 1,
+  "forward_days": 5,
+  "top_k_features": 25,
+  "train_years": 3,
+  "test_months": 3,
+  "mode": "expanding",
+  "embargo_days": 7,
+  "ranker_params": {},
+  "n_long": 10,
+  "n_short": 10,
+  "rebalance_freq": "W",
+  "regime_filter": true,
+  "adx_threshold": 20.0,
+  "min_hold_days": 3,
+  "transaction_cost": 0.001,
+  "slippage": 0.0
+}
