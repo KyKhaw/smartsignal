@@ -176,13 +176,34 @@ my_data/
 ```python
 from smartsignal.workflow.pipeline import SmartSignalPipeline
 
-pipe   = SmartSignalPipeline(n_long=10, n_short=10, train_years=3)
+pipe   = SmartSignalPipeline(n_long=10, n_short=10, train_years=3) #adjust n_long/n_short according to universe size
 result = pipe.run(data_dir="./my_data")
 result.print_summary()
 result.plot(save_dir="./charts")
 ```
 
-### Option B - Single stacked CSV (all tickers in one file)
+### Option B (EASIEST) - yfinance ticker list (Note: yfinance is called in pipe.run automatically when ticker arg is passed)
+
+```python
+from smartsignal.workflow.pipeline import SmartSignalPipeline
+
+tickers = [
+    "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","JPM","V","UNH",
+    "JNJ","XOM","WMT","MA","PG","HD","CVX","MRK","ABBV","PEP",
+]
+
+pipe = SmartSignalPipeline(
+    start_date="2018-01-01",
+    n_long=5,
+    n_short=5,
+    train_years=2,
+)
+result = pipe.run(tickers=tickers)
+result.print_summary()
+result.plot(save_dir="./charts/try")
+```
+
+### Option C - Single stacked CSV (all tickers in one file)
 
 ```
 date,       ticker, open,  high,  low,   close, volume
@@ -200,7 +221,7 @@ result = pipe.run(dfs=dfs)
 
 The `ticker_col` argument is auto-detected if omitted - the loader uses a cardinality heuristic to identify which string column encodes instrument identifiers.
 
-### Option C - Pre-loaded DataFrames in memory
+### Option D - Pre-loaded DataFrames in memory
 
 ```python
 dfs = {
@@ -209,15 +230,6 @@ dfs = {
     "TSLA": df_tsla,
 }
 result = pipe.run(dfs=dfs)
-```
-
-### Option D - yfinance ticker list (Note: yfinance is called in pipe.run automatically when ticker arg is passed)
-
-```python
-result = pipe.run(
-    tickers=["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"],
-    start="2018-01-01",
-)
 ```
 
 ### Data requirements
