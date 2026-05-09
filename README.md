@@ -14,7 +14,7 @@ The pipeline covers six stages end-to-end: data ingestion and validation → 42-
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Using Your Own Data](#using-your-own-data)
-- [Configuration Reference](#configuration-reference)
+- [Pipeline Configurations](#pipeline-configurations)
 - [Expected Results](#expected-results)
 - [Visualisation Report](#visualisation-report)
 - [Repository Structure](#repository-structure)
