@@ -59,20 +59,18 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PipelineResult:
     """Container for all pipeline outputs."""
-    backtest_result:    object                    # BacktestResult
+    backtest_result:    object
     baselines:          Dict[str, pd.Series]
     panel_scored:       pd.DataFrame = field(repr=False)
     feature_importance: Optional[pd.DataFrame] = None
     selected_features:  Optional[List[str]] = None
     metrics_table:      Optional[pd.DataFrame] = None
+    training_results:   Optional[List] = None   # list of TrainingResult per fold
 
     def print_summary(self) -> None:
-        """Print a formatted performance summary."""
         from smartsignal.utils.metrics import compare_strategies
-
         strategies = {"LambdaMART L/S": self.backtest_result.strategy_returns}
         strategies.update(self.baselines)
-
         print("\n" + "=" * 60)
         print("  SmartSignal — Performance Summary")
         print("=" * 60)
@@ -80,41 +78,48 @@ class PipelineResult:
         self.metrics_table = table
         print(table.to_string())
         print("=" * 60)
-
         m = self.backtest_result.metrics
         print(f"\n  Sharpe : {m['sharpe']:.3f}  |  "
               f"Ann. Return : {m['ann_return']:+.2%}  |  "
               f"Max DD : {m['max_drawdown']:.2%}")
-
         if self.selected_features:
             print(f"\n  Selected features ({len(self.selected_features)}): "
                   f"{', '.join(self.selected_features[:8])}"
-                  + (" …" if len(self.selected_features) > 8 else ""))
+                  + (" ..." if len(self.selected_features) > 8 else ""))
 
     def plot(
         self,
-        save_path: Optional[str] = None,
-        show: bool = True,
-    ):
-        """Render the 5-panel performance dashboard."""
-        from smartsignal.utils.plotting import plot_performance
+        save_dir:     Optional[str] = None,
+        show:         bool          = True,
+        title_suffix: str           = "",
+        dpi:          int           = 150,
+        fmt:          str           = "png",
+    ) -> Dict:
+        """
+        Generate the full 4-figure visualisation report.
 
-        fig = plot_performance(
-            strategy_returns   = self.backtest_result.strategy_returns,
-            baselines          = self.baselines,
-            long_returns       = self.backtest_result.long_returns,
-            short_returns      = self.backtest_result.short_returns,
-            positions          = self.backtest_result.positions,
-            feature_importance = self.feature_importance,
-            save_path          = save_path,
+        Parameters
+        ----------
+        save_dir     : directory to save PNG/PDF files (None = don't save).
+        show         : whether to display figures interactively.
+        title_suffix : text appended to each figure title.
+        dpi          : resolution for saved images.
+        fmt          : 'png', 'pdf', or 'svg'.
+
+        Returns
+        -------
+        dict of {figure_name: matplotlib Figure}.
+        """
+        from smartsignal.utils.report import generate_report
+        return generate_report(
+            result           = self,
+            save_dir         = save_dir,
+            show             = show,
+            training_results = self.training_results,
+            title_suffix     = title_suffix,
+            dpi              = dpi,
+            fmt              = fmt,
         )
-        try:
-            import matplotlib.pyplot as plt
-            if show:
-                plt.show()
-        except ImportError:
-            pass
-        return fig
 
 
 # ──────────────────────────────────────────────────────────────
@@ -252,7 +257,7 @@ class SmartSignalPipeline:
         panel = self._stage_labels(panel)
 
         # ── Stage 4: Walk-forward training ────────────────────
-        panel_scored, model = self._stage_train(panel)
+        panel_scored, model, training_results = self._stage_train(panel)
 
         # ── Stage 5: Backtesting ───────────────────────────────
         backtest_result = self._stage_backtest(panel_scored, dfs)
@@ -275,11 +280,12 @@ class SmartSignalPipeline:
             print(f"\n[Pipeline] Completed in {elapsed:.1f}s.")
 
         return PipelineResult(
-            backtest_result   = backtest_result,
-            baselines         = baselines,
-            panel_scored      = panel_scored,
-            feature_importance= fi_df,
-            selected_features = getattr(model, "selected_features_", None),
+            backtest_result    = backtest_result,
+            baselines          = baselines,
+            panel_scored       = panel_scored,
+            feature_importance = fi_df,
+            selected_features  = getattr(model, "selected_features_", None),
+            training_results   = training_results,
         )
 
     # ── Stage implementations ──────────────────────────────────
@@ -346,19 +352,18 @@ class SmartSignalPipeline:
         return generate_labels(panel, label_type="quintile", n_bins=4)
 
     def _stage_train(self, panel: pd.DataFrame):
-        from smartsignal.models.lambdamart   import LambdaMARTRanker
+        from smartsignal.models.lambdamart    import LambdaMARTRanker
         from smartsignal.models.panel_trainer import PanelTrainer
         from smartsignal.features.equity_features import FEATURE_COLS
 
         if self.verbose:
-            print("\n[Stage 4/6] Walk-forward training …")
+            print("\n[Stage 4/6] Walk-forward training ...")
 
         model = LambdaMARTRanker(
             feature_cols   = FEATURE_COLS,
             top_k_features = self.top_k_features,
             ranker_params  = self.ranker_params,
         )
-
         trainer = PanelTrainer(
             model                  = model,
             train_years            = self.train_years,
@@ -366,13 +371,12 @@ class SmartSignalPipeline:
             embargo_days           = self.embargo_days,
             mode                   = self.mode,
             forward_days           = self.forward_days,
-            min_tickers_per_date   = None,   # auto-detect from universe
-            feature_selection_freq = 0,      # select once on fold 0
+            min_tickers_per_date   = None,
+            feature_selection_freq = 0,
             verbose                = self.verbose,
         )
-
-        panel_scored, _ = trainer.fit_predict(panel)
-        return panel_scored, model
+        panel_scored, training_results = trainer.fit_predict(panel)
+        return panel_scored, model, training_results
 
     def _stage_backtest(
         self, panel_scored: pd.DataFrame, dfs: Dict

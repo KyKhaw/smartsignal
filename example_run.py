@@ -3,172 +3,82 @@ example_run.py
 ==============
 End-to-end SmartSignal usage examples.
 
-Run from the smartsignal/ project root:
-    python example_run.py
+    python example_run.py --example quick
+    python example_run.py --example sp500 --tickers 50 --start 2018-01-01
+    python example_run.py --example own_data --data_dir ./my_data/
+    python example_run.py --example advanced
 
-Three examples are provided:
-    1. QUICK  – 5 tickers, 3 years, runs in ~60 seconds (no yfinance needed,
-                uses synthetic data to demonstrate the full pipeline offline).
-    2. SP500  – full S&P 500 universe, live yfinance download (requires internet).
-    3. ADVANCED – model comparison + parameter grid search on your own data.
+Dependencies
+    pip install lightgbm scikit-learn pandas numpy matplotlib seaborn yfinance
 """
 
-import sys
-import os
-
-# Add the project root to sys.path if running as a script
+import sys, os, warnings
 sys.path.insert(0, os.path.dirname(__file__))
+warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
 
 
-# ══════════════════════════════════════════════════════════════
-# HELPER: Synthetic OHLCV generator (no internet required)
-# ══════════════════════════════════════════════════════════════
-
-def make_synthetic_universe(
-    n_tickers: int = 30,
-    n_days: int = 1500,
-    start: str = "2019-01-01",
-    seed: int = 42,
-) -> dict:
-    """
-    Generate synthetic OHLCV data for a small equity universe.
-    Used by Example 1 so the pipeline can be tested offline.
-    """
+def make_synthetic_universe(n_tickers=30, n_days=1500,
+                             start="2019-01-01", seed=42):
     rng   = np.random.default_rng(seed)
     dates = pd.bdate_range(start=start, periods=n_days)
     dfs   = {}
-
     for i in range(n_tickers):
-        ticker  = f"SYN{i:03d}"
-        log_ret = rng.normal(0.0003, 0.015, n_days)
-        close   = 100 * np.exp(np.cumsum(log_ret))
-        high    = close * (1 + rng.uniform(0.000, 0.012, n_days))
-        low     = close * (1 - rng.uniform(0.000, 0.012, n_days))
-        open_   = close * (1 + rng.normal(0, 0.005, n_days))
-        volume  = rng.integers(500_000, 5_000_000, n_days).astype(float)
-
-        df = pd.DataFrame(
-            {"open": open_, "high": high, "low": low,
-             "close": close, "volume": volume},
-            index=dates,
-        )
-        dfs[ticker] = df
-
+        t   = f"SYN{i:03d}"
+        ret = rng.normal(0.0003, 0.015, n_days)
+        c   = 100 * np.exp(np.cumsum(ret))
+        dfs[t] = pd.DataFrame({
+            "open":   c * (1 + rng.normal(0, 0.005, n_days)),
+            "high":   c * (1 + rng.uniform(0.000, 0.012, n_days)),
+            "low":    c * (1 - rng.uniform(0.000, 0.012, n_days)),
+            "close":  c,
+            "volume": rng.integers(500_000, 5_000_000, n_days).astype(float),
+        }, index=dates)
     return dfs
 
 
-# ══════════════════════════════════════════════════════════════
-# EXAMPLE 1 – Quick offline demo with synthetic data
-# ══════════════════════════════════════════════════════════════
+# ── Example 1: Quick synthetic demo ───────────────────────────
 
 def example_quick():
-    """
-    Minimal end-to-end pipeline on synthetic data.
-    Demonstrates every module without any internet connection.
-    Takes ~30–60 seconds.
-    """
-    print("\n" + "═" * 60)
-    print("  EXAMPLE 1 — Quick Demo (Synthetic Data)")
-    print("═" * 60)
-
+    print("\n" + "="*60)
+    print("  EXAMPLE 1 - Quick Demo (Synthetic Data)")
+    print("="*60)
     from smartsignal.workflow.pipeline import SmartSignalPipeline
 
-    # ── Generate synthetic universe ───────────────────────────
-    print("\n[Step 0] Generating 30-ticker synthetic universe (1 500 days) …")
-    dfs = make_synthetic_universe(n_tickers=30, n_days=1500)
-
-    # ── Configure pipeline ────────────────────────────────────
+    dfs  = make_synthetic_universe(n_tickers=30, n_days=1500)
     pipe = SmartSignalPipeline(
-        start_date       = "2019-01-01",
-        # Features
-        execution_lag    = 1,
-        forward_days     = 5,
-        # Model
-        top_k_features   = 20,
-        train_years      = 2,
-        test_months      = 3,
-        mode             = "expanding",
-        embargo_days     = 7,
-        # Backtesting
-        n_long           = 5,
-        n_short          = 5,
-        rebalance_freq   = "W",
-        regime_filter    = True,
-        adx_threshold    = 15.0,
-        min_hold_days    = 2,
-        transaction_cost = 0.001,
-        verbose          = True,
+        execution_lag=1,   forward_days=5,
+        top_k_features=20, train_years=2,  test_months=3,
+        embargo_days=7,    n_long=5,        n_short=5,
+        rebalance_freq="W", regime_filter=True, adx_threshold=15.0,
+        min_hold_days=2,   transaction_cost=0.001, verbose=True,
     )
-
-    # ── Run all 6 stages ──────────────────────────────────────
     result = pipe.run(dfs=dfs, compute_baselines=True)
-
-    # ── Print summary ─────────────────────────────────────────
     result.print_summary()
 
-    # ── Cross-sectional analytics ──────────────────────────────
-    from smartsignal.backtesting.cross_section import (
-        quintile_returns,
-        cross_sectional_ic,
-        spread_decomposition,
-    )
-
-    qr = quintile_returns(result.panel_scored)
-    print("\n[Analytics] Mean return by score quintile:")
-    print(qr[["mean_return"]].to_string())
-
-    decomp = spread_decomposition(result.panel_scored)
-    print(f"\n[Analytics] Spread decomposition:")
-    for k, v in decomp.items():
-        print(f"  {k:<25}: {v:+.4f}")
-
-    # ── Feature importance ────────────────────────────────────
-    if result.feature_importance is not None:
-        print("\n[Analytics] Top-10 features:")
-        top10 = result.feature_importance.head(10)[["feature", "category", "importance"]]
-        print(top10.to_string(index=False))
-
+    print("\n[Charts] Generating 4-figure report ...")
+    result.plot(save_dir="./charts/quick", show=True)
     return result
 
 
-# ══════════════════════════════════════════════════════════════
-# EXAMPLE 2 – Live S&P 500 pipeline (requires internet)
-# ══════════════════════════════════════════════════════════════
+# ── Example 2: S&P 500 live ───────────────────────────────────
 
-def example_sp500(
-    n_tickers: int = 50,
-    start: str = "2018-01-01",
-):
-    """
-    Full pipeline on a sample of S&P 500 tickers downloaded via yfinance.
-
-    Parameters
-    ----------
-    n_tickers : number of S&P 500 tickers to use (50 is fast, 500 is complete).
-    start     : history start date.
-    """
-    print("\n" + "═" * 60)
-    print("  EXAMPLE 2 — S&P 500 Live Pipeline")
-    print("═" * 60)
-
-    from smartsignal.data.universe   import fetch_sp500_tickers
+def example_sp500(n_tickers=50, start="2018-01-01"):
+    print("\n" + "="*60)
+    print("  EXAMPLE 2 - S&P 500 Live Pipeline")
+    print("="*60)
+    from smartsignal.data.universe     import fetch_sp500_tickers
     from smartsignal.workflow.pipeline import SmartSignalPipeline
     from smartsignal.workflow.helpers  import (
-        PipelineConfig, validate_pipeline_config,
-        make_run_id, save_results
+        PipelineConfig, validate_pipeline_config, make_run_id, save_results
     )
+    from smartsignal.backtesting.performance import information_coefficient
 
-    # ── Fetch tickers ─────────────────────────────────────────
-    print(f"\n[Step 0] Fetching S&P 500 ticker list …")
     try:
-        all_tickers = fetch_sp500_tickers()
-        tickers = all_tickers[:n_tickers]
-        print(f"  Using {len(tickers)} tickers: {tickers[:5]} …")
-    except Exception as e:
-        print(f"  Warning: could not fetch S&P 500 list ({e}). Using hardcoded sample.")
+        tickers = fetch_sp500_tickers()[:n_tickers]
+    except Exception:
         tickers = [
             "AAPL","MSFT","GOOGL","AMZN","NVDA","META","BRK-B","JPM","V","UNH",
             "XOM","LLY","AVGO","MA","HD","CVX","MRK","ABBV","KO","PEP",
@@ -177,19 +87,89 @@ def example_sp500(
             "BMY","AMGN","LOW","INTC","SBUX","RTX","CAT","GS","IBM","BLK",
         ][:n_tickers]
 
-    # ── Build typed config ─────────────────────────────────────
+    print(f"  Using {len(tickers)} tickers: {tickers[:5]} ...")
+
     cfg = PipelineConfig(
+        start_date="2018-01-01", min_history_days=504,
+        min_avg_volume=500_000,  min_avg_price=5.0,
+        execution_lag=1,         forward_days=5,
+        top_k_features=25,       train_years=3,
+        test_months=3,           embargo_days=7,
+        n_long=10, n_short=10,   rebalance_freq="W",
+        regime_filter=True,      adx_threshold=20.0,
+        min_hold_days=3,         transaction_cost=0.001,
+    )
+
+    pipe = SmartSignalPipeline(**{
+        k: v for k, v in cfg.to_dict().items()
+        if k in SmartSignalPipeline.__init__.__code__.co_varnames
+    })
+    result = pipe.run(tickers=tickers, compute_baselines=True)
+
+    run_id = make_run_id(cfg)
+    save_results(result, "./runs", run_id=run_id, cfg=cfg)
+    result.print_summary()
+
+    ic = information_coefficient(
+        result.panel_scored["rank_score"],
+        result.panel_scored["fwd_ret"]
+    )
+    print(f"\n[IC]  Mean={ic['ic_mean']:.4f}  "
+          f"ICIR={ic['icir']:.3f}  +ve%={ic['ic_positive_pct']:.1%}")
+
+    print("\n[Charts] Generating 4-figure report ...")
+    result.plot(save_dir=f"./charts/sp500_{run_id}", show=True,
+                title_suffix=" - S&P 500")
+    return result
+
+
+# ── Example 3: Your own data ──────────────────────────────────
+
+def example_own_data(data_dir="./my_data", start="2015-01-01"):
+    """
+    HOW TO USE YOUR OWN DATASET
+    ===========================
+    Option A  Directory of CSV files, one per ticker:
+        my_data/AAPL.csv, my_data/MSFT.csv, ...
+        Each file needs: date, open, high, low, close, volume columns.
+        Run: python example_run.py --example own_data --data_dir ./my_data
+
+    Option B  Single stacked CSV (all tickers in one file):
+        date,       ticker, open, high, low,  close, volume
+        2018-01-02, AAPL,   170,  172,  169,  172,   25000000
+        ...
+        Code:
+            from smartsignal.data.loader import load_equity_data
+            dfs = load_equity_data("./all_stocks.csv", ticker_col="ticker")
+            result = pipe.run(dfs=dfs)
+
+    Option C  Pre-loaded DataFrames already in memory:
+            dfs = {"AAPL": df_aapl, "MSFT": df_msft}
+            result = pipe.run(dfs=dfs)
+
+    Option D  yfinance ticker list:
+            result = pipe.run(tickers=["AAPL","MSFT"], start="2018-01-01")
+    """
+    print("\n" + "="*60)
+    print("  EXAMPLE 3 - Your Own Data")
+    print("="*60)
+    from smartsignal.workflow.pipeline import SmartSignalPipeline
+
+    pipe = SmartSignalPipeline(
+        # Adjust to your market/data
         start_date       = start,
-        min_history_days = 504,
-        min_avg_volume   = 500_000,
-        min_avg_price    = 5.0,
+        min_history_days = 252,       # >= 1 year per ticker
+        min_avg_volume   = 100_000,   # lower for non-US markets
+        min_avg_price    = 1.0,       # lower for non-USD prices
+        # Features
         execution_lag    = 1,
         forward_days     = 5,
+        # Model
         top_k_features   = 25,
-        train_years      = 3,
+        train_years      = 2,
         test_months      = 3,
-        mode             = "expanding",
         embargo_days     = 7,
+        # Backtest
         n_long           = 10,
         n_short          = 10,
         rebalance_freq   = "W",
@@ -197,130 +177,108 @@ def example_sp500(
         adx_threshold    = 20.0,
         min_hold_days    = 3,
         transaction_cost = 0.001,
-        slippage         = 0.0,
+        verbose          = True,
     )
 
-    # Pre-flight validation
-    issues = validate_pipeline_config(cfg)
-    if issues:
-        print("\n[Config] Warnings:")
-        for w in issues:
-            print(f"  ⚠  {w}")
-
-    # ── Run pipeline ──────────────────────────────────────────
-    pipe = SmartSignalPipeline(**{
-        k: v for k, v in cfg.to_dict().items()
-        if k in SmartSignalPipeline.__init__.__code__.co_varnames
-    })
-    result = pipe.run(tickers=tickers, compute_baselines=True)
-
-    # ── Save results ──────────────────────────────────────────
-    run_id   = make_run_id(cfg)
-    out_path = save_results(result, output_dir="./runs", run_id=run_id, cfg=cfg)
-    print(f"\n[Saved] Results at: {out_path}")
-
-    # ── Performance summary ───────────────────────────────────
+    # Single call — point at your data directory
+    result = pipe.run(data_dir=data_dir, compute_baselines=True)
     result.print_summary()
 
-    # ── IC analysis ───────────────────────────────────────────
-    from smartsignal.backtesting.performance import information_coefficient
-    ic_stats = information_coefficient(
-        result.panel_scored["rank_score"],
-        result.panel_scored["fwd_ret"],
-    )
-    print(f"\n[IC Analysis]")
-    print(f"  IC Mean  : {ic_stats['ic_mean']:.4f}")
-    print(f"  ICIR     : {ic_stats['icir']:.3f}")
-    print(f"  IC +ve % : {ic_stats['ic_positive_pct']:.1%}")
-
+    print("\n[Charts] Generating 4-figure report ...")
+    result.plot(save_dir="./charts/own_data", show=True)
     return result
 
 
-# ══════════════════════════════════════════════════════════════
-# EXAMPLE 3 – Advanced: model comparison + grid search
-# ══════════════════════════════════════════════════════════════
+# ── Example 4: Advanced (model comparison + grid search) ──────
 
 def example_advanced():
-    """
-    Run multiple model families on the same synthetic data, then
-    grid-search strategy parameters for the best LambdaMART config.
-    """
-    print("\n" + "═" * 60)
-    print("  EXAMPLE 3 — Advanced: Model Comparison + Grid Search")
-    print("═" * 60)
-
-    from smartsignal.workflow.combined import ModelComparisonRun, StrategyGridRun
-    from smartsignal.workflow.helpers  import PipelineConfig
-    from smartsignal.workflow.pipeline import SmartSignalPipeline
+    print("\n" + "="*60)
+    print("  EXAMPLE 4 - Advanced: Model Comparison + Grid Search")
+    print("="*60)
+    from smartsignal.workflow.combined        import ModelComparisonRun, StrategyGridRun
+    from smartsignal.workflow.helpers         import PipelineConfig
+    from smartsignal.workflow.pipeline        import SmartSignalPipeline, PipelineResult
+    from smartsignal.models.panel_trainer     import PanelTrainer
+    from smartsignal.models.lambdamart        import LambdaMARTRanker
+    from smartsignal.features.equity_features import FEATURE_COLS, FEATURE_CATEGORIES
+    from smartsignal.backtesting.baselines    import run_all_baselines
+    from smartsignal.backtesting.engine       import run_backtest
 
     dfs = make_synthetic_universe(n_tickers=40, n_days=1500)
     cfg = PipelineConfig(train_years=2, test_months=3, top_k_features=20)
 
-    # ── Model comparison ──────────────────────────────────────
-    print("\n[Step 1] Model comparison across 4 families …")
-    comp_run = ModelComparisonRun(
-        dfs    = dfs,
-        cfg    = cfg,
-        models = ["lambdamart", "lgbm_classifier", "random_forest", "ridge"],
-    )
-    table = comp_run.run(verbose=True)
+    # Step 1: model comparison
+    print("\n[Step 1] Model comparison across 4 families ...")
+    comp  = ModelComparisonRun(dfs=dfs, cfg=cfg,
+                               models=["lambdamart","lgbm_classifier",
+                                       "random_forest","ridge"])
+    table = comp.run(verbose=True)
     print("\n[Model Comparison Table]")
     print(table.to_string())
 
-    # ── Pre-compute LambdaMART scored panel for grid search ───
-    print("\n[Step 2] Pre-computing LambdaMART scored panel for grid search …")
-    base_pipe = SmartSignalPipeline(train_years=2, test_months=3, verbose=False)
-    dfs_f     = base_pipe._stage_data(dfs, None, None)
-    panel     = base_pipe._stage_features(dfs_f)
-    panel     = base_pipe._stage_labels(panel)
-    panel_scored, _ = SmartSignalPipeline(
-        train_years=2, test_months=3, verbose=True
-    )._stage_train(panel)
+    # Step 2: LambdaMART scored panel for grid search
+    print("\n[Step 2] Pre-computing LambdaMART scored panel ...")
+    pipe  = SmartSignalPipeline(train_years=2, test_months=3, verbose=True)
+    dfs_f = pipe._stage_data(dfs, None, None)
+    panel = pipe._stage_features(dfs_f)
+    panel = pipe._stage_labels(panel)
 
-    # ── Strategy grid search ──────────────────────────────────
-    print("\n[Step 3] Grid-searching strategy parameters …")
-    grid_run = StrategyGridRun(
-        panel_scored = panel_scored,
-        dfs          = dfs_f,
-        param_grid   = {
+    model   = LambdaMARTRanker(feature_cols=FEATURE_COLS, top_k_features=20)
+    trainer = PanelTrainer(model=model, train_years=2, test_months=3,
+                           embargo_days=7, forward_days=5, verbose=True)
+    panel_scored, training_results = trainer.fit_predict(panel)
+
+    # Step 3: parameter grid search
+    print("\n[Step 3] Grid-searching strategy parameters ...")
+    grid = StrategyGridRun(
+        panel_scored=panel_scored, dfs=dfs_f,
+        param_grid={
             "n_long":         [5, 10],
             "n_short":        [5, 10],
             "rebalance_freq": ["W", "ME"],
             "min_hold_days":  [1, 3],
         },
     )
-    grid_df    = grid_run.run(verbose=True)
-    best_params = grid_run.best_params()
+    grid.run(verbose=True)
+    best_params = grid.best_params()
     print(f"\n[Grid Search] Best parameters: {best_params}")
 
-    return comp_run, grid_run
+    # Step 4: final backtest + visualise
+    bt        = run_backtest(panel_scored, dfs_f, verbose=False, **best_params)
+    fi_df     = model.feature_importance_df()
+    fi_df["category"] = fi_df["feature"].map(FEATURE_CATEGORIES).fillna("other")
+    baselines = run_all_baselines(dfs_f, verbose=False)
+
+    result = PipelineResult(
+        backtest_result    = bt,
+        baselines          = baselines,
+        panel_scored       = panel_scored,
+        feature_importance = fi_df,
+        selected_features  = model.selected_features_,
+        training_results   = training_results,
+    )
+    result.print_summary()
+
+    print("\n[Charts] Generating 4-figure report ...")
+    result.plot(save_dir="./charts/advanced", show=True,
+                title_suffix=" - Advanced Demo")
+    return result
 
 
-# ══════════════════════════════════════════════════════════════
-# MAIN
-# ══════════════════════════════════════════════════════════════
+# ── Main ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--example",
+                   choices=["quick","sp500","own_data","advanced"],
+                   default="quick")
+    p.add_argument("--tickers",  type=int, default=50)
+    p.add_argument("--start",    default="2018-01-01")
+    p.add_argument("--data_dir", default="./my_data")
+    args = p.parse_args()
 
-    parser = argparse.ArgumentParser(description="SmartSignal pipeline examples")
-    parser.add_argument(
-        "--example", choices=["quick", "sp500", "advanced"], default="quick",
-        help="Which example to run (default: quick)"
-    )
-    parser.add_argument(
-        "--tickers", type=int, default=50,
-        help="Number of S&P 500 tickers to use in the sp500 example"
-    )
-    parser.add_argument(
-        "--start", default="2018-01-01",
-        help="Start date for the sp500 example (YYYY-MM-DD)"
-    )
-    args = parser.parse_args()
-
-    if args.example == "quick":
-        example_quick()
-    elif args.example == "sp500":
-        example_sp500(n_tickers=args.tickers, start=args.start)
-    elif args.example == "advanced":
-        example_advanced()
+    if   args.example == "quick":    example_quick()
+    elif args.example == "sp500":    example_sp500(args.tickers, args.start)
+    elif args.example == "own_data": example_own_data(args.data_dir, args.start)
+    elif args.example == "advanced": example_advanced()
