@@ -230,7 +230,7 @@ result = pipe.run(
 
 ---
 
-## Configuration Reference
+## Pipeline Configurations
 
 All pipeline parameters are set in `SmartSignalPipeline.__init__`. Every parameter has a sensible default; you only need to override what matters for your use case.
 
