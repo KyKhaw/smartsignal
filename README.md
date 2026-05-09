@@ -162,27 +162,7 @@ IMPORTANT NOTE 1: Ensure that your datasets span a large enough period for the w
 IMPORTANT NOTE 2: Ensure that your ticker universe is sufficient for the total n_long + n_short. Adjust the parameters as appropriate.
 SmartSignal accepts data in four ways. Once loaded, the rest of the pipeline is identical regardless of source.
 
-### Option A - Directory of per-ticker CSV or Parquet files
-
-Place one file per ticker in a folder. File names become ticker symbols. Each file must contain date, open, high, low, close, and volume columns (column names are auto-detected through a synonym dictionary - `adj_close`, `last_price`, `px`, `Adj Close`, etc. all resolve correctly).
-
-```
-my_data/
-    AAPL.csv
-    MSFT.csv
-    TSLA.csv
-```
-
-```python
-from smartsignal.workflow.pipeline import SmartSignalPipeline
-
-pipe   = SmartSignalPipeline(n_long=10, n_short=10, train_years=3) #adjust n_long/n_short according to universe size
-result = pipe.run(data_dir="./my_data")
-result.print_summary()
-result.plot(save_dir="./charts/self")
-```
-
-### Option B (EASIEST) - yfinance ticker list (Note: yfinance is called in pipe.run automatically when ticker arg is passed)
+### Option A (EASIEST) - yfinance ticker list (Note: yfinance is called in pipe.run automatically when ticker arg is passed)
 
 ```python
 from smartsignal.workflow.pipeline import SmartSignalPipeline
@@ -201,6 +181,26 @@ pipe = SmartSignalPipeline(
 result = pipe.run(tickers=tickers)
 result.print_summary()
 result.plot(save_dir="./charts/yfinance")
+```
+
+### Option B - Directory of per-ticker CSV or Parquet files
+
+Place one file per ticker in a folder. File names become ticker symbols. Each file must contain date, open, high, low, close, and volume columns (column names are auto-detected through a synonym dictionary - `adj_close`, `last_price`, `px`, `Adj Close`, etc. all resolve correctly).
+
+```
+my_data/
+    AAPL.csv
+    MSFT.csv
+    TSLA.csv
+```
+
+```python
+from smartsignal.workflow.pipeline import SmartSignalPipeline
+
+pipe   = SmartSignalPipeline(n_long=10, n_short=10, train_years=3) #adjust n_long/n_short according to universe size
+result = pipe.run(data_dir="./my_data")
+result.print_summary()
+result.plot(save_dir="./charts/self")
 ```
 
 ### Option C - Single stacked CSV (all tickers in one file)
