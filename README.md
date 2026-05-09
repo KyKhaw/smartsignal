@@ -179,7 +179,7 @@ from smartsignal.workflow.pipeline import SmartSignalPipeline
 pipe   = SmartSignalPipeline(n_long=10, n_short=10, train_years=3) #adjust n_long/n_short according to universe size
 result = pipe.run(data_dir="./my_data")
 result.print_summary()
-result.plot(save_dir="./charts")
+result.plot(save_dir="./charts/self")
 ```
 
 ### Option B (EASIEST) - yfinance ticker list (Note: yfinance is called in pipe.run automatically when ticker arg is passed)
@@ -200,7 +200,7 @@ pipe = SmartSignalPipeline(
 )
 result = pipe.run(tickers=tickers)
 result.print_summary()
-result.plot(save_dir="./charts/try")
+result.plot(save_dir="./charts/yfinance")
 ```
 
 ### Option C - Single stacked CSV (all tickers in one file)
