@@ -158,6 +158,7 @@ Runs three additional steps on top of the base pipeline:
 
 ## Using Your Own Data
 IMPORTANT NOTE 1: Ensure that your datasets span a large enough period for the walk-forward validation to function. Recommendation: 2018/XX/XX - 2026/XX/XX
+
 IMPORTANT NOTE 2: Ensure that your ticker universe is sufficient for the total n_long + n_short. Adjust the parameters as appropriate.
 SmartSignal accepts data in four ways. Once loaded, the rest of the pipeline is identical regardless of source.
 
