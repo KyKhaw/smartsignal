@@ -232,7 +232,7 @@ result = pipe.run(
 
 ## Pipeline Configurations
 
-All pipeline parameters are set in `SmartSignalPipeline.__init__`. Every parameter has a sensible default; you only need to override what matters for your use case.
+All pipeline parameters are set in `pipeline.SmartSignalPipeline.__init__`. Every parameter has a sensible default; you only need to override what matters for your use case.
 
 ```python
 from smartsignal.workflow.pipeline import SmartSignalPipeline
