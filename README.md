@@ -13,7 +13,6 @@ The pipeline covers six stages end-to-end: data ingestion and validation → 42-
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Running the Examples](#running-the-examples)
 - [Using Your Own Data](#using-your-own-data)
 - [Configuration Reference](#configuration-reference)
 - [Expected Results](#expected-results)
@@ -109,24 +108,6 @@ pip install -r requirements.txt
 ---
 
 ## Quick Start
-
-The fastest way to verify your installation is the offline synthetic example, which needs no internet connection and completes in roughly 60 seconds:
-
-```bash
-python example_run.py --example quick
-```
-
-This generates 30 synthetic tickers, runs all six pipeline stages, prints a performance summary, and saves four chart files to `./charts/quick/`.
-
-For a live S&P 500 run on 50 tickers from 2018:
-
-```bash
-python example_run.py --example sp500 --tickers 50 --start 2018-01-01
-```
-
----
-
-## Running the Examples
 
 `example_run.py` exposes four self-contained examples through a single CLI flag.
 
