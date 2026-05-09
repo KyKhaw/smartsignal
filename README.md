@@ -28,9 +28,9 @@ The pipeline covers six stages end-to-end: data ingestion and validation → 42-
 SmartSignal is organised as six sequential pipeline stages, each backed by a dedicated module:
 
 ```
-Raw OHLCV Data
-      │
-      ▼
+                    Raw OHLCV Data
+                           │
+                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │  Stage 1 · Data Ingestion          smartsignal/data/    │
 │  loader · universe · schema · validator                 │
