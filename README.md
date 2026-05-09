@@ -111,7 +111,7 @@ pip install -r requirements.txt
 
 `example_run.py` exposes four self-contained examples through a single CLI flag.
 
-### Example 1 — Quick (synthetic, offline)
+### Example 1 - Quick (synthetic, offline)
 
 ```bash
 python example_run.py --example quick
@@ -119,7 +119,7 @@ python example_run.py --example quick
 
 Generates a 30-ticker synthetic OHLCV universe (geometric Brownian motion) and runs the full pipeline. No internet connection required. Useful for verifying the installation, testing configuration changes, and understanding the output format before touching real data.
 
-### Example 2 — S&P 500 (live yfinance download)
+### Example 2 - S&P 500 (live yfinance download)
 
 ```bash
 python example_run.py --example sp500 --tickers 50 --start 2018-01-01
@@ -134,7 +134,7 @@ Flags:
 | `--tickers` | `50` | Number of S&P 500 tickers to download |
 | `--start` | `2018-01-01` | History start date (YYYY-MM-DD) |
 
-### Example 3 — Your Own Data
+### Example 3 - Your Own Data
 
 ```bash
 python example_run.py --example own_data --data_dir ./my_data --start 2015-01-01
@@ -142,7 +142,7 @@ python example_run.py --example own_data --data_dir ./my_data --start 2015-01-01
 
 Points the pipeline at a directory of your own CSV or Parquet files. See [Using Your Own Data](#using-your-own-data) for the full set of input options.
 
-### Example 4 — Advanced (model comparison + grid search)
+### Example 4 - Advanced (model comparison + grid search)
 
 ```bash
 python example_run.py --example advanced
@@ -150,9 +150,9 @@ python example_run.py --example advanced
 
 Runs three additional steps on top of the base pipeline:
 
-1. **Model comparison** — trains LambdaMART, LightGBM classifier, Random Forest, and Ridge on the same feature panel and produces a side-by-side Sharpe/return/drawdown table.
-2. **Pre-computed scored panel** — reuses the walk-forward predictions to avoid re-training for each grid point.
-3. **Parameter grid search** — sweeps `n_long`, `n_short`, `rebalance_freq`, and `min_hold_days` combinations and ranks them by out-of-sample Sharpe.
+1. **Model comparison** - trains LambdaMART, LightGBM classifier, Random Forest, and Ridge on the same feature panel and produces a side-by-side Sharpe/return/drawdown table.
+2. **Pre-computed scored panel** - reuses the walk-forward predictions to avoid re-training for each grid point.
+3. **Parameter grid search** - sweeps `n_long`, `n_short`, `rebalance_freq`, and `min_hold_days` combinations and ranks them by out-of-sample Sharpe.
 
 ---
 
@@ -160,9 +160,9 @@ Runs three additional steps on top of the base pipeline:
 
 SmartSignal accepts data in four ways. Once loaded, the rest of the pipeline is identical regardless of source.
 
-### Option A — Directory of per-ticker CSV or Parquet files
+### Option A - Directory of per-ticker CSV or Parquet files
 
-Place one file per ticker in a folder. File names become ticker symbols. Each file must contain date, open, high, low, close, and volume columns (column names are auto-detected through a synonym dictionary — `adj_close`, `last_price`, `px`, `Adj Close`, etc. all resolve correctly).
+Place one file per ticker in a folder. File names become ticker symbols. Each file must contain date, open, high, low, close, and volume columns (column names are auto-detected through a synonym dictionary - `adj_close`, `last_price`, `px`, `Adj Close`, etc. all resolve correctly).
 
 ```
 my_data/
@@ -180,7 +180,7 @@ result.print_summary()
 result.plot(save_dir="./charts")
 ```
 
-### Option B — Single stacked CSV (all tickers in one file)
+### Option B - Single stacked CSV (all tickers in one file)
 
 ```
 date,       ticker, open,  high,  low,   close, volume
@@ -196,9 +196,9 @@ dfs    = load_equity_data("./all_stocks.csv", ticker_col="ticker")
 result = pipe.run(dfs=dfs)
 ```
 
-The `ticker_col` argument is auto-detected if omitted — the loader uses a cardinality heuristic to identify which string column encodes instrument identifiers.
+The `ticker_col` argument is auto-detected if omitted - the loader uses a cardinality heuristic to identify which string column encodes instrument identifiers.
 
-### Option C — Pre-loaded DataFrames in memory
+### Option C - Pre-loaded DataFrames in memory
 
 ```python
 dfs = {
@@ -209,7 +209,7 @@ dfs = {
 result = pipe.run(dfs=dfs)
 ```
 
-### Option D — yfinance ticker list
+### Option D - yfinance ticker list (Note: yfinance is called in pipe.run automatically when ticker arg is passed)
 
 ```python
 result = pipe.run(
@@ -283,7 +283,7 @@ pipe = SmartSignalPipeline(
 | `embargo_days` | Safer leakage prevention | More data used for training |
 | `adx_threshold` | Trade less often (conservative) | Trade more often |
 | `min_hold_days` | Lower turnover, higher costs saved | More responsive signals |
-| `transaction_cost` | More realistic, lower net return | — |
+| `transaction_cost` | More realistic, lower net return | - |
 
 ---
 
@@ -320,7 +320,7 @@ result.plot(
 )
 ```
 
-### Figure 1 — Performance Dashboard
+### Figure 1 - Performance Dashboard
 
 - Equity curves for strategy vs baselines
 - Long / short leg equity curves
@@ -328,7 +328,7 @@ result.plot(
 - Position count over time (long and short exposure)
 - Top-20 feature importance bar chart, coloured by category
 
-### Figure 2 — Signal Quality
+### Figure 2 - Signal Quality
 
 - Mean forward return per score quintile
 - Directional hit rate per score quintile
@@ -336,12 +336,12 @@ result.plot(
 - Walk-forward fold-by-fold validation Sharpe bar chart
 - 63-day rolling annualised Sharpe
 
-### Figure 3 — Monthly Returns Heatmap
+### Figure 3 - Monthly Returns Heatmap
 
 - Year × month return heatmap for each strategy with annual totals
 - Colour-coded green/red cells using a diverging scale centred at zero
 
-### Figure 4 — Risk Analytics
+### Figure 4 - Risk Analytics
 
 - Return distribution histogram with normal fit overlay and VaR 95% marker
 - Q-Q plot vs normal distribution (requires `scipy`; falls back to rolling vol)
@@ -414,7 +414,7 @@ smartsignal/
     ├── utils/
     │   ├── metrics.py           # compute_metrics(), compare_strategies()
     │   ├── plotting.py          # plot_performance() legacy 5-panel chart
-    │   ├── report.py            # generate_report() — full 4-figure report
+    │   ├── report.py            # generate_report() - full 4-figure report
     │   └── compat.py            # Pandas version compatibility (ME/YE aliases)
     │
     └── workflow/
@@ -468,4 +468,4 @@ All model families implement the `BaseModel` interface (`fit(panel)` / `predict(
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
